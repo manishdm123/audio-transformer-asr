@@ -1,0 +1,70 @@
+<section
+  id="job-panel"
+  class="job-panel"
+  {% if job.status.value in ["queued", "running"] %}
+    hx-get="/jobs/{{ job.id }}/panel"
+    hx-trigger="every 2s"
+    hx-swap="outerHTML"
+  {% endif %}
+>
+  <div class="job-toolbar">
+    <div class="job-title-block">
+      <p class="eyebrow">{{ job.status.value }}</p>
+      <h1>{{ job.filename }}</h1>
+    </div>
+    <div class="export-actions">
+      <a class="export-link {% if job.status.value != 'done' %}disabled{% endif %}" href="/jobs/{{ job.id }}/download/txt">TXT</a>
+      <a class="export-link {% if job.status.value != 'done' %}disabled{% endif %}" href="/jobs/{{ job.id }}/download/md">MD</a>
+      <a class="export-link {% if job.status.value != 'done' %}disabled{% endif %}" href="/jobs/{{ job.id }}/download/srt">SRT</a>
+      <a class="export-link {% if job.status.value != 'done' %}disabled{% endif %}" href="/jobs/{{ job.id }}/download/json">JSON</a>
+    </div>
+  </div>
+
+  <div class="status-strip">
+    <div>
+      <span class="status-label">Stage</span>
+      <strong>{{ job.stage }}</strong>
+    </div>
+    <div>
+      <span class="status-label">Model</span>
+      <strong>{{ job.options.model_size }}</strong>
+    </div>
+    <div>
+      <span class="status-label">Language</span>
+      <strong>{{ job.language or job.options.language or "auto" }}</strong>
+    </div>
+    <div>
+      <span class="status-label">Segments</span>
+      <strong>{{ job.segments | length }}</strong>
+    </div>
+  </div>
+
+  <div class="progress-track" aria-label="Progress">
+    <div class="progress-fill" style="width: {{ job.progress_percent }}%"></div>
+  </div>
+
+  {% if job.error %}
+    <div class="error-box">{{ job.error }}</div>
+  {% endif %}
+
+  <div class="transcript">
+    {% if job.segments %}
+      {% for segment in job.segments %}
+        <article class="segment">
+          <time>{{ "%.2f"|format(segment.start) }}s</time>
+          <p>{{ segment.text }}</p>
+        </article>
+      {% endfor %}
+    {% elif job.status.value in ["queued", "running"] %}
+      <div class="empty-state compact">
+        <h2>{{ job.stage }}</h2>
+        <p>The transcript will appear here as segments complete.</p>
+      </div>
+    {% else %}
+      <div class="empty-state compact">
+        <h2>No transcript</h2>
+        <p>This job did not produce transcript segments.</p>
+      </div>
+    {% endif %}
+  </div>
+</section>

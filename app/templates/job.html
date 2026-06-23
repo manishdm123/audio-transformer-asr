@@ -1,0 +1,12 @@
+{% extends "layout.html" %}
+
+{% block content %}
+  <aside class="sidebar">
+    {% include "partials/upload_form.html" %}
+    {% include "partials/job_list.html" %}
+  </aside>
+
+  <main class="workspace">
+    {% include "partials/job_panel.html" %}
+  </main>
+{% endblock %}

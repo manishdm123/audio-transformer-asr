@@ -1,0 +1,18 @@
+<section class="panel job-list-panel">
+  <div class="panel-header">
+    <h2>Jobs</h2>
+  </div>
+
+  {% if jobs %}
+    <nav class="job-list" aria-label="Transcription jobs">
+      {% for item in jobs %}
+        <a class="job-link status-{{ item.status.value }}" href="/jobs/{{ item.id }}">
+          <span class="job-name">{{ item.filename }}</span>
+          <span class="job-meta">{{ item.status.value }} · {{ item.progress_percent }}%</span>
+        </a>
+      {% endfor %}
+    </nav>
+  {% else %}
+    <p class="muted">No jobs yet.</p>
+  {% endif %}
+</section>

@@ -1,0 +1,1 @@
+"""Local audio transcription app."""

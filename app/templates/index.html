@@ -1,0 +1,21 @@
+{% extends "layout.html" %}
+
+{% block content %}
+  <aside class="sidebar">
+    {% include "partials/upload_form.html" %}
+    {% include "partials/job_list.html" %}
+  </aside>
+
+  <main class="workspace">
+    {% if active_job %}
+      {% with job=active_job %}
+        {% include "partials/job_panel.html" %}
+      {% endwith %}
+    {% else %}
+      <section class="empty-state">
+        <h1>Audio2Text</h1>
+        <p>Drop in a conversation recording to start a local transcript job.</p>
+      </section>
+    {% endif %}
+  </main>
+{% endblock %}

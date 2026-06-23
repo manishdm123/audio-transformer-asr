@@ -1,0 +1,50 @@
+<section class="panel upload-panel">
+  <div class="panel-header">
+    <h2>New Job</h2>
+  </div>
+
+  <form class="job-form" action="/jobs" method="post" enctype="multipart/form-data">
+    <label class="drop-zone">
+      <input type="file" name="audio" accept="audio/*,video/*" required>
+      <span>Choose audio</span>
+    </label>
+
+    <label>
+      <span>Model</span>
+      <select name="model_size">
+        {% for model in models %}
+          <option value="{{ model }}" {% if model == "small" %}selected{% endif %}>{{ model }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label>
+      <span>Language</span>
+      <select name="language">
+        <option value="en" selected>English</option>
+        <option value="auto">Auto detect</option>
+      </select>
+    </label>
+
+    <label>
+      <span>Compute</span>
+      <select name="compute_type">
+        {% for compute_type in compute_types %}
+          <option value="{{ compute_type }}" {% if compute_type == "int8" %}selected{% endif %}>{{ compute_type }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label class="check-row">
+      <input type="checkbox" name="vad_filter" checked>
+      <span>Voice filtering</span>
+    </label>
+
+    <label class="check-row">
+      <input type="checkbox" name="word_timestamps">
+      <span>Word timestamps</span>
+    </label>
+
+    <button class="primary-button" type="submit">Start Transcription</button>
+  </form>
+</section>
