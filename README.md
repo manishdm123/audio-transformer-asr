@@ -1,6 +1,6 @@
 # audio2text
 
-Local-first transcription workspace for long business conversations.
+Local-first transcription workspace for audio conversations.
 
 ## Run
 
