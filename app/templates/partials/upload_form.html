@@ -45,6 +45,26 @@
       <span>Word timestamps</span>
     </label>
 
+    <label class="check-row">
+      <input type="checkbox" name="diarization">
+      <span>Speaker diarization</span>
+    </label>
+
+    <div class="speaker-grid">
+      <label>
+        <span>Exact speakers</span>
+        <input type="number" name="num_speakers" min="1" max="20" inputmode="numeric">
+      </label>
+      <label>
+        <span>Min</span>
+        <input type="number" name="min_speakers" min="1" max="20" inputmode="numeric">
+      </label>
+      <label>
+        <span>Max</span>
+        <input type="number" name="max_speakers" min="1" max="20" inputmode="numeric">
+      </label>
+    </div>
+
     <button class="primary-button" type="submit">Start Transcription</button>
   </form>
 </section>

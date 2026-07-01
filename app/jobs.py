@@ -16,6 +16,13 @@ class JobStatus(str, Enum):
 
 
 @dataclass
+class DiarizationTurn:
+    start: float
+    end: float
+    speaker: str
+
+
+@dataclass
 class Segment:
     start: float
     end: float
@@ -31,6 +38,10 @@ class TranscriptionOptions:
     compute_type: str
     word_timestamps: bool
     vad_filter: bool
+    diarization: bool = False
+    num_speakers: int | None = None
+    min_speakers: int | None = None
+    max_speakers: int | None = None
 
 
 @dataclass
@@ -49,6 +60,7 @@ class Job:
     language: str | None = None
     duration: float | None = None
     segments: list[Segment] = field(default_factory=list)
+    diarization_turns: list[DiarizationTurn] = field(default_factory=list)
 
     @property
     def progress_percent(self) -> int:

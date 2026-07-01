@@ -21,6 +21,13 @@ OUTPUT_DIR = DATA_DIR / "outputs"
 for directory in (UPLOAD_DIR, OUTPUT_DIR):
     directory.mkdir(parents=True, exist_ok=True)
 
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(BASE_DIR / ".env")
+except ImportError:
+    pass
+
 app = FastAPI(title="audio2text")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "app" / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "app" / "templates")
@@ -53,6 +60,10 @@ async def create_job(
     compute_type: str = Form("int8"),
     word_timestamps: bool = Form(False),
     vad_filter: bool = Form(True),
+    diarization: bool = Form(False),
+    num_speakers: str = Form(""),
+    min_speakers: str = Form(""),
+    max_speakers: str = Form(""),
 ) -> RedirectResponse:
     job_id = uuid.uuid4().hex
     filename = _safe_filename(audio.filename or "audio")
@@ -62,12 +73,22 @@ async def create_job(
         while chunk := await audio.read(1024 * 1024):
             target.write(chunk)
 
+    parsed_num_speakers = _optional_int(num_speakers)
+    parsed_min_speakers = _optional_int(min_speakers)
+    parsed_max_speakers = _optional_int(max_speakers)
+    if parsed_min_speakers and parsed_max_speakers and parsed_min_speakers > parsed_max_speakers:
+        raise HTTPException(status_code=400, detail="Minimum speakers cannot be greater than maximum speakers")
+
     options = TranscriptionOptions(
         model_size=model_size,
         language=None if language == "auto" else language,
         compute_type=compute_type,
-        word_timestamps=word_timestamps,
+        word_timestamps=word_timestamps or diarization,
         vad_filter=vad_filter,
+        diarization=diarization,
+        num_speakers=parsed_num_speakers,
+        min_speakers=parsed_min_speakers,
+        max_speakers=parsed_max_speakers,
     )
     job = Job(
         id=job_id,
@@ -131,6 +152,14 @@ def _get_job(job_id: str) -> Job:
 def _safe_filename(filename: str) -> str:
     cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", Path(filename).name).strip("-")
     return cleaned or "audio"
+
+
+def _optional_int(value: str) -> int | None:
+    value = value.strip()
+    if not value:
+        return None
+    parsed = int(value)
+    return parsed if parsed > 0 else None
 
 
 def main() -> None:

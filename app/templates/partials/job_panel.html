@@ -37,6 +37,16 @@
       <span class="status-label">Segments</span>
       <strong>{{ job.segments | length }}</strong>
     </div>
+    <div>
+      <span class="status-label">Speakers</span>
+      <strong>
+        {% if job.options.diarization %}
+          {{ job.diarization_turns | map(attribute="speaker") | unique | list | length }}
+        {% else %}
+          off
+        {% endif %}
+      </strong>
+    </div>
   </div>
 
   <div class="progress-track" aria-label="Progress">
@@ -52,7 +62,12 @@
       {% for segment in job.segments %}
         <article class="segment">
           <time>{{ "%.2f"|format(segment.start) }}s</time>
-          <p>{{ segment.text }}</p>
+          <p>
+            {% if segment.speaker %}
+              <strong>{{ segment.speaker }}</strong>
+            {% endif %}
+            {{ segment.text }}
+          </p>
         </article>
       {% endfor %}
     {% elif job.status.value in ["queued", "running"] %}

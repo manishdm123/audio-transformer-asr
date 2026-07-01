@@ -110,10 +110,12 @@ h2 {
 }
 
 .job-form select,
-.job-form input[type="file"] {
+.job-form input[type="file"],
+.job-form input[type="number"] {
   width: 100%;
 }
 
+input[type="number"],
 select {
   height: 36px;
   border: 1px solid var(--line);
@@ -150,6 +152,12 @@ select {
   gap: 8px !important;
   color: var(--text) !important;
   font-size: 14px !important;
+}
+
+.speaker-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px 72px;
+  gap: 8px;
 }
 
 .primary-button {
@@ -279,7 +287,7 @@ select {
 
 .status-strip {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface);
@@ -359,6 +367,14 @@ select {
   line-height: 1.55;
 }
 
+.segment strong {
+  display: inline-block;
+  margin-right: 8px;
+  color: var(--accent);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
 .empty-state {
   display: grid;
   min-height: 360px;
@@ -400,7 +416,8 @@ select {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .status-strip > div:nth-child(2) {
+  .status-strip > div:nth-child(2),
+  .status-strip > div:nth-child(4) {
     border-right: 0;
   }
 
@@ -408,7 +425,7 @@ select {
     border-bottom: 1px solid var(--line);
   }
 
-  .status-strip > div:nth-child(n + 3) {
+  .status-strip > div:nth-child(n + 5) {
     border-bottom: 0;
   }
 }
@@ -438,6 +455,10 @@ select {
 
   .status-strip > div:last-child {
     border-bottom: 0;
+  }
+
+  .speaker-grid {
+    grid-template-columns: 1fr;
   }
 
   .segment {
