@@ -4,8 +4,9 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Audio2Text</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}">
-    <script defer src="{{ url_for('static', path='/app.js') }}"></script>
+    {% set version = asset_version if asset_version is defined else "20260825-progress-v2" %}
+    <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}?v={{ version }}">
+    <script defer src="{{ url_for('static', path='/app.js') }}?v={{ version }}"></script>
   </head>
   <body>
     <header class="topbar">

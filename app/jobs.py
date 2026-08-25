@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -57,14 +58,21 @@ class Job:
     progress: float = 0.0
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    stage_started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     language: str | None = None
     duration: float | None = None
     segments: list[Segment] = field(default_factory=list)
     diarization_turns: list[DiarizationTurn] = field(default_factory=list)
+    exports_ready: bool = False
 
     @property
     def progress_percent(self) -> int:
         return max(0, min(100, int(self.progress * 100)))
+
+    @property
+    def stage_elapsed_seconds(self) -> int:
+        end = datetime.now(timezone.utc) if self.status in {JobStatus.QUEUED, JobStatus.RUNNING} else self.updated_at
+        return max(0, int((end - self.stage_started_at).total_seconds()))
 
 
 class JobStore:
@@ -89,7 +97,20 @@ class JobStore:
             job = self._jobs.get(job_id)
             if job is None:
                 return None
+            now = datetime.now(timezone.utc)
+            if "stage" in changes and changes["stage"] != job.stage:
+                job.stage_started_at = now
             for key, value in changes.items():
                 setattr(job, key, value)
-            job.updated_at = datetime.now(timezone.utc)
+            job.updated_at = now
             return job
+
+    def edit(self, job_id: str, editor: Callable[[Job], Any]) -> tuple[Job, Any] | None:
+        """Apply a serialized edit to a job and return the editor result."""
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if job is None:
+                return None
+            result = editor(job)
+            job.updated_at = datetime.now(timezone.utc)
+            return job, result

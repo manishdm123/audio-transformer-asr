@@ -13,7 +13,10 @@
       <span>Model</span>
       <select name="model_size">
         {% for model in models %}
-          <option value="{{ model }}" {% if model == "small" %}selected{% endif %}>{{ model }}</option>
+          <option
+            value="{{ model }}"
+            {% if model == (form_options.model_size if form_options else "small") %}selected{% endif %}
+          >{{ model }}</option>
         {% endfor %}
       </select>
     </label>
@@ -21,8 +24,8 @@
     <label>
       <span>Language</span>
       <select name="language">
-        <option value="en" selected>English</option>
-        <option value="auto">Auto detect</option>
+        <option value="en" {% if not form_options or form_options.language == "en" %}selected{% endif %}>English</option>
+        <option value="auto" {% if form_options and form_options.language is none %}selected{% endif %}>Auto detect</option>
       </select>
     </label>
 
@@ -30,38 +33,62 @@
       <span>Compute</span>
       <select name="compute_type">
         {% for compute_type in compute_types %}
-          <option value="{{ compute_type }}" {% if compute_type == "int8" %}selected{% endif %}>{{ compute_type }}</option>
+          <option
+            value="{{ compute_type }}"
+            {% if compute_type == (form_options.compute_type if form_options else "int8") %}selected{% endif %}
+          >{{ compute_type }}</option>
         {% endfor %}
       </select>
     </label>
 
     <label class="check-row">
-      <input type="checkbox" name="vad_filter" checked>
+      <input type="checkbox" name="vad_filter" {% if not form_options or form_options.vad_filter %}checked{% endif %}>
       <span>Voice filtering</span>
     </label>
 
     <label class="check-row">
-      <input type="checkbox" name="word_timestamps">
+      <input type="checkbox" name="word_timestamps" {% if form_options and form_options.word_timestamps %}checked{% endif %}>
       <span>Word timestamps</span>
     </label>
 
     <label class="check-row">
-      <input type="checkbox" name="diarization">
+      <input type="checkbox" name="diarization" {% if form_options and form_options.diarization %}checked{% endif %}>
       <span>Speaker diarization</span>
     </label>
 
     <div class="speaker-grid">
       <label>
         <span>Exact speakers</span>
-        <input type="number" name="num_speakers" min="1" max="20" inputmode="numeric">
+        <input
+          type="number"
+          name="num_speakers"
+          min="1"
+          max="20"
+          inputmode="numeric"
+          value="{{ form_options.num_speakers or '' if form_options else '' }}"
+        >
       </label>
       <label>
         <span>Min</span>
-        <input type="number" name="min_speakers" min="1" max="20" inputmode="numeric">
+        <input
+          type="number"
+          name="min_speakers"
+          min="1"
+          max="20"
+          inputmode="numeric"
+          value="{{ form_options.min_speakers or '' if form_options else '' }}"
+        >
       </label>
       <label>
         <span>Max</span>
-        <input type="number" name="max_speakers" min="1" max="20" inputmode="numeric">
+        <input
+          type="number"
+          name="max_speakers"
+          min="1"
+          max="20"
+          inputmode="numeric"
+          value="{{ form_options.max_speakers or '' if form_options else '' }}"
+        >
       </label>
     </div>
 

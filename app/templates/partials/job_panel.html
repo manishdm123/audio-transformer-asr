@@ -1,6 +1,7 @@
 <section
   id="job-panel"
   class="job-panel"
+  data-job-id="{{ job.id }}"
   {% if job.status.value in ["queued", "running"] %}
     hx-get="/jobs/{{ job.id }}/panel"
     hx-trigger="every 2s"
@@ -12,11 +13,14 @@
       <p class="eyebrow">{{ job.status.value }}</p>
       <h1>{{ job.filename }}</h1>
     </div>
+    {% set job_exports_ready = job.exports_ready if job.exports_ready is defined else false %}
+    {% set stage_started = job.stage_started_at if job.stage_started_at is defined else job.updated_at %}
+    {% set exports_available = job.status.value == "done" or job_exports_ready %}
     <div class="export-actions">
-      <a class="export-link {% if job.status.value != 'done' %}disabled{% endif %}" href="/jobs/{{ job.id }}/download/txt">TXT</a>
-      <a class="export-link {% if job.status.value != 'done' %}disabled{% endif %}" href="/jobs/{{ job.id }}/download/md">MD</a>
-      <a class="export-link {% if job.status.value != 'done' %}disabled{% endif %}" href="/jobs/{{ job.id }}/download/srt">SRT</a>
-      <a class="export-link {% if job.status.value != 'done' %}disabled{% endif %}" href="/jobs/{{ job.id }}/download/json">JSON</a>
+      <a class="export-link {% if not exports_available %}disabled{% endif %}" href="/jobs/{{ job.id }}/download/txt">TXT</a>
+      <a class="export-link {% if not exports_available %}disabled{% endif %}" href="/jobs/{{ job.id }}/download/md">MD</a>
+      <a class="export-link {% if not exports_available %}disabled{% endif %}" href="/jobs/{{ job.id }}/download/srt">SRT</a>
+      <a class="export-link {% if not exports_available %}disabled{% endif %}" href="/jobs/{{ job.id }}/download/json">JSON</a>
     </div>
   </div>
 
@@ -47,7 +51,21 @@
         {% endif %}
       </strong>
     </div>
+    <div>
+      <span class="status-label">Stage started</span>
+      <strong>{{ stage_started.strftime("%H:%M:%S UTC") }}</strong>
+      <span
+        class="status-detail"
+        data-stage-elapsed
+        data-started-at="{{ stage_started.isoformat() }}"
+        data-running="{{ 'true' if job.status.value in ['queued', 'running'] else 'false' }}"
+      >{{ (job.stage_elapsed_seconds if job.stage_elapsed_seconds is defined else 0) | clock }} elapsed</span>
+    </div>
   </div>
+
+  {% if job_exports_ready and job.status.value == "running" %}
+    <div class="notice-box">The transcript is ready to view and download while speaker diarization continues.</div>
+  {% endif %}
 
   <div class="progress-track" aria-label="Progress">
     <div class="progress-fill" style="width: {{ job.progress_percent }}%"></div>
@@ -57,17 +75,129 @@
     <div class="error-box">{{ job.error }}</div>
   {% endif %}
 
+  {% if job.status.value == "done" and job.segments %}
+    <section class="editor-tools" aria-label="Transcript editor tools">
+      <div class="audio-dock">
+        <div class="audio-heading">
+          <div>
+            <p class="eyebrow">Audio workspace</p>
+            <h2>Listen and edit in sync</h2>
+          </div>
+          <label class="follow-control">
+            <input type="checkbox" data-follow-playback checked>
+            <span>Follow playback</span>
+          </label>
+        </div>
+        <audio data-audio-player controls preload="metadata" src="/jobs/{{ job.id }}/audio">
+          Your browser does not support audio playback.
+        </audio>
+        <div class="audio-shortcuts">
+          <button type="button" class="secondary-button" data-skip="-5">−5s</button>
+          <output data-playback-time>00:00</output>
+          <button type="button" class="secondary-button" data-skip="5">+5s</button>
+          <span>Click any timestamp to jump to that segment.</span>
+        </div>
+      </div>
+
+      <div class="edit-toolbar">
+        <div class="toolbar-heading">
+          <div>
+            <p class="eyebrow">Find and replace</p>
+            <h2>Clean up repeated terms</h2>
+          </div>
+          <button type="button" class="primary-button compact-button" data-save-all>Save all edits</button>
+        </div>
+        <div class="replace-grid">
+          <label>
+            <span>Find</span>
+            <input type="search" data-search-text placeholder="Search transcript">
+          </label>
+          <label>
+            <span>Replace with</span>
+            <input type="text" data-replacement-text placeholder="Replacement">
+          </label>
+          <label class="check-row match-case-control">
+            <input type="checkbox" data-match-case>
+            <span>Match case</span>
+          </label>
+          <button type="button" class="secondary-button" data-find-next>Find next</button>
+          <button type="button" class="secondary-button" data-replace-all>Replace all</button>
+        </div>
+        <div class="editor-feedback" data-editor-feedback role="status" aria-live="polite">
+          All edits regenerate TXT, MD, SRT, and JSON exports automatically.
+        </div>
+      </div>
+
+      {% set speakers = job.segments | map(attribute="speaker") | reject("none") | unique | list %}
+      {% if speakers %}
+        <div class="speaker-editor">
+          <div>
+            <p class="eyebrow">Speakers</p>
+            <h2>Rename across the transcript</h2>
+          </div>
+          <div class="speaker-list">
+            {% for speaker in speakers %}
+              <form class="speaker-rename" data-speaker-rename data-current-speaker="{{ speaker }}">
+                <label>
+                  <span class="sr-only">Rename {{ speaker }}</span>
+                  <input type="text" value="{{ speaker }}" maxlength="80" required>
+                </label>
+                <button type="submit" class="secondary-button">Rename</button>
+              </form>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+    </section>
+  {% endif %}
+
   <div class="transcript">
     {% if job.segments %}
       {% for segment in job.segments %}
-        <article class="segment">
-          <time>{{ "%.2f"|format(segment.start) }}s</time>
-          <p>
-            {% if segment.speaker %}
-              <strong>{{ segment.speaker }}</strong>
+        <article
+          class="segment {% if job.status.value == 'done' %}editable-segment{% endif %}"
+          data-segment-index="{{ loop.index0 }}"
+          data-start="{{ segment.start }}"
+          data-end="{{ segment.end }}"
+        >
+          <div class="segment-meta">
+            {% if job.status.value == "done" %}
+              <button type="button" class="segment-time" data-seek="{{ segment.start }}">
+                {{ segment.start | clock }}
+              </button>
+            {% else %}
+              <time>{{ "%.2f"|format(segment.start) }}s</time>
             {% endif %}
-            {{ segment.text }}
-          </p>
+            {% if segment.speaker %}
+              <span class="speaker-label">{{ segment.speaker }}</span>
+            {% endif %}
+          </div>
+          {% if job.status.value == "done" %}
+            <div class="segment-editor">
+              <label>
+                <span class="sr-only">Segment {{ loop.index }} transcript text</span>
+                <textarea data-segment-text rows="2">{{ segment.text }}</textarea>
+              </label>
+              <div class="segment-actions">
+                <button type="button" class="secondary-button" data-save-segment>Save</button>
+                <button type="button" class="secondary-button" data-split-segment>Split at cursor</button>
+                <button
+                  type="button"
+                  class="text-button"
+                  data-merge-segment="previous"
+                  {% if loop.first %}disabled{% endif %}
+                >Merge previous</button>
+                <button
+                  type="button"
+                  class="text-button"
+                  data-merge-segment="next"
+                  {% if loop.last %}disabled{% endif %}
+                >Merge next</button>
+              </div>
+            </div>
+          {% else %}
+            <p>{{ segment.text }}</p>
+          {% endif %}
         </article>
       {% endfor %}
     {% elif job.status.value in ["queued", "running"] %}
