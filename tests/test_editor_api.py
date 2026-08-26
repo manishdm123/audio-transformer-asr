@@ -30,6 +30,42 @@ class TranscriptEditorApiTests(unittest.TestCase):
         response = self.client.get("/jobs/job-1/audio")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.content, b"RIFF-test-audio")
+        self.assertEqual(response.headers["cache-control"], "no-store")
+
+    def test_audio_endpoint_never_serves_a_partial_normalized_file(self) -> None:
+        (self.directory / "job-1.wav").write_bytes(b"RIFF-partial-normalization")
+
+        response = self.client.get("/jobs/job-1/audio")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, b"RIFF-test-audio")
+
+    def test_new_job_form_defaults_and_audio_preview(self) -> None:
+        main_module.store = JobStore()
+
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.text
+        self.assertRegex(html, re.compile(r'<option\s+value="medium"\s+selected', re.MULTILINE))
+        self.assertRegex(html, r'name="diarization" checked')
+        self.assertIn("data-audio-input", html)
+        self.assertIn("data-selected-audio-player", html)
+
+    def test_audio_player_is_available_while_transcription_is_running(self) -> None:
+        main_module.store.get("job-1").status = JobStatus.RUNNING
+
+        response = self.client.get("/jobs/job-1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('data-job-workspace', response.text)
+        self.assertIn('data-audio-player', response.text)
+        self.assertIn('/jobs/job-1/audio?source=original', response.text)
+        self.assertRegex(response.text, r'id="job-panel"[\s\S]+?hx-trigger="every 2s"')
+        self.assertLess(response.text.index('data-audio-player'), response.text.index('id="job-panel"'))
+
+        polled_panel = self.client.get("/jobs/job-1/panel")
+        self.assertNotIn('data-audio-player', polled_panel.text)
 
     def test_job_page_preserves_submitted_transcription_options(self) -> None:
         job = main_module.store.get("job-1")

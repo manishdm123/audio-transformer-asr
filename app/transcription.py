@@ -482,9 +482,12 @@ def _normalized_audio_path(job: Job) -> Path:
         logger.warning("job=%s ffmpeg_not_found using_original_upload=%s", job.id, job.upload_path.name)
         return job.upload_path
 
+    job.output_dir.mkdir(parents=True, exist_ok=True)
     target = job.output_dir / f"{job.id}.wav"
+    temporary = job.output_dir / f".{job.id}.normalizing.wav"
     normalization_started = time.monotonic()
     logger.info("job=%s ffmpeg_normalization_started binary=%s", job.id, ffmpeg)
+    temporary.unlink(missing_ok=True)
     try:
         subprocess.run(
             [
@@ -498,19 +501,24 @@ def _normalized_audio_path(job: Job) -> Path:
                 "1",
                 "-c:a",
                 "pcm_s16le",
-                str(target),
+                str(temporary),
             ],
             check=True,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.PIPE,
             text=True,
         )
+        if temporary.stat().st_size <= 128:
+            raise RuntimeError(
+                "Audio normalization produced an empty file. Check that the upload contains readable audio."
+            )
+        temporary.replace(target)
     except subprocess.CalledProcessError as exc:
         details = (exc.stderr or "").strip().splitlines()
         tail = " | ".join(details[-4:]) if details else str(exc)
         raise RuntimeError(f"Audio normalization failed: {tail}") from exc
-    if target.stat().st_size <= 128:
-        raise RuntimeError("Audio normalization produced an empty file. Check that the upload contains readable audio.")
+    finally:
+        temporary.unlink(missing_ok=True)
     logger.info(
         "job=%s ffmpeg_normalization_complete output_bytes=%d elapsed=%.1fs",
         job.id,

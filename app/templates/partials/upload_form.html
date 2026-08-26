@@ -5,7 +5,7 @@
 
   <form class="job-form" action="/jobs" method="post" enctype="multipart/form-data">
     <label class="drop-zone">
-      <input type="file" name="audio" accept="audio/*,video/*" required>
+      <input type="file" name="audio" accept="audio/*,video/*" data-audio-input required>
       <span>Choose audio</span>
     </label>
 
@@ -15,7 +15,7 @@
         {% for model in models %}
           <option
             value="{{ model }}"
-            {% if model == (form_options.model_size if form_options else "small") %}selected{% endif %}
+            {% if model == (form_options.model_size if form_options else "medium") %}selected{% endif %}
           >{{ model }}</option>
         {% endfor %}
       </select>
@@ -52,7 +52,7 @@
     </label>
 
     <label class="check-row">
-      <input type="checkbox" name="diarization" {% if form_options and form_options.diarization %}checked{% endif %}>
+      <input type="checkbox" name="diarization" {% if not form_options or form_options.diarization %}checked{% endif %}>
       <span>Speaker diarization</span>
     </label>
 

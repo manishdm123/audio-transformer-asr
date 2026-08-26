@@ -69,10 +69,10 @@ The job page is rendered with Jinja2 and enhanced with vanilla JavaScript. It po
 
 | Purpose | Model or runtime | Configuration in this app |
 | --- | --- | --- |
-| Speech-to-text | OpenAI Whisper models executed by `faster-whisper` on the CTranslate2 runtime | `tiny`, `base`, `small` (default), `medium`, or `large-v3`; English or automatic language detection; `int8` (default), `float16`, or `float32` compute |
+| Speech-to-text | OpenAI Whisper models executed by `faster-whisper` on the CTranslate2 runtime | `tiny`, `base`, `small`, `medium` (default), or `large-v3`; English or automatic language detection; `int8` (default), `float16`, or `float32` compute |
 | Voice activity detection | Silero VAD integrated into `faster-whisper` | Enabled by default through `vad_filter`; it suppresses non-speech regions before/during transcription |
 | Word timing | Whisper word timestamps from `faster-whisper` | Optional in the UI and automatically enabled when speaker diarization is selected |
-| Speaker diarization | `pyannote/speaker-diarization-community-1` through `pyannote.audio` | Optional; requires an accepted Hugging Face model license and `HF_TOKEN`; supports exact, minimum, or maximum speaker-count constraints |
+| Speaker diarization | `pyannote/speaker-diarization-community-1` through `pyannote.audio` | Enabled by default; requires an accepted Hugging Face model license and `HF_TOKEN`; supports exact, minimum, or maximum speaker-count constraints |
 | Speaker-to-text synchronization | Deterministic timestamp-overlap logic in `app/transcription.py` | Uses word spans when available and segment spans as a fallback; this step does not use another ML model |
 
 Model inference runs locally after the required model artifacts have been downloaded and cached by the underlying libraries. The Hugging Face token is used to retrieve the gated pyannote pipeline; audio is not sent to an application-owned remote service.

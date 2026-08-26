@@ -11,6 +11,46 @@ function elementsMatching(root, selector) {
   return matches;
 }
 
+const audioSyncControllers = new WeakMap();
+
+function wireUploadPreview(root = document) {
+  elementsMatching(root, "[data-audio-input]").forEach((input) => {
+    if (input.dataset.previewWired === "true") return;
+    const preview = document.querySelector("[data-audio-preview]");
+    const player = preview?.querySelector("[data-selected-audio-player]");
+    const name = preview?.querySelector("[data-audio-name]");
+    if (!preview || !player || !name) return;
+
+    input.dataset.previewWired = "true";
+    let objectUrl = null;
+    const currentJobDock = document.querySelector("[data-job-audio-dock]");
+    const resetPreview = () => {
+      player.pause();
+      player.removeAttribute("src");
+      player.load();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      objectUrl = null;
+      name.textContent = "";
+      preview.hidden = true;
+      if (currentJobDock) currentJobDock.hidden = false;
+    };
+
+    input.addEventListener("change", () => {
+      resetPreview();
+      const file = input.files?.[0];
+      if (!file) return;
+
+      objectUrl = URL.createObjectURL(file);
+      player.src = objectUrl;
+      name.textContent = file.name;
+      preview.hidden = false;
+      if (currentJobDock) currentJobDock.hidden = true;
+      player.load();
+    });
+    window.addEventListener("pagehide", resetPreview, { once: true });
+  });
+}
+
 function wirePolling(root = document) {
   elementsMatching(root, "[hx-get][hx-trigger][hx-swap='outerHTML']").forEach((element) => {
     if (element.dataset.polling === "true") return;
@@ -142,12 +182,6 @@ async function saveTextareas(panel, textareas, quiet = false) {
 }
 
 async function refreshPanel(panel, { message = "", focusIndex = null } = {}) {
-  const player = panel.querySelector("[data-audio-player]");
-  const playbackState = player
-    ? { currentTime: player.currentTime, shouldPlay: !player.paused }
-    : { currentTime: 0, shouldPlay: false };
-  const follow = panel.querySelector("[data-follow-playback]")?.checked ?? true;
-
   const response = await fetch(`/jobs/${panel.dataset.jobId}/panel`, {
     cache: "no-store",
     headers: { "X-Requested-With": "fetch" },
@@ -157,18 +191,6 @@ async function refreshPanel(panel, { message = "", focusIndex = null } = {}) {
   if (!replacement) throw new Error("The refreshed transcript was empty.");
   panel.replaceWith(replacement);
   wireApp(replacement);
-
-  const newFollow = replacement.querySelector("[data-follow-playback]");
-  if (newFollow) newFollow.checked = follow;
-  const newPlayer = replacement.querySelector("[data-audio-player]");
-  if (newPlayer) {
-    const restorePlayback = () => {
-      newPlayer.currentTime = Math.min(playbackState.currentTime, newPlayer.duration || playbackState.currentTime);
-      if (playbackState.shouldPlay) newPlayer.play().catch(() => {});
-    };
-    if (newPlayer.readyState >= 1) restorePlayback();
-    else newPlayer.addEventListener("loadedmetadata", restorePlayback, { once: true });
-  }
 
   if (message) setFeedback(replacement, message);
   if (focusIndex !== null && focusIndex !== undefined) {
@@ -180,14 +202,20 @@ async function refreshPanel(panel, { message = "", focusIndex = null } = {}) {
 }
 
 function wireAudioSync(panel) {
-  const player = panel.querySelector("[data-audio-player]");
+  const workspace = panel.closest("[data-job-workspace]") || panel;
+  const player = workspace.querySelector("[data-audio-player]");
   if (!player) return;
-  const segments = [...panel.querySelectorAll("[data-segment-index]")];
-  const timeOutput = panel.querySelector("[data-playback-time]");
+  audioSyncControllers.get(player)?.abort();
+  const controller = new AbortController();
+  const { signal } = controller;
+  audioSyncControllers.set(player, controller);
+
+  const timeOutput = workspace.querySelector("[data-playback-time]");
   let activeSegment = null;
 
   const sync = () => {
     if (timeOutput) timeOutput.textContent = formatClock(player.currentTime);
+    const segments = [...panel.querySelectorAll("[data-segment-index]")];
     const active = segments.find((segment) => {
       const start = Number(segment.dataset.start);
       const end = Number(segment.dataset.end);
@@ -197,31 +225,32 @@ function wireAudioSync(panel) {
     activeSegment?.classList.remove("is-active");
     activeSegment = active || null;
     activeSegment?.classList.add("is-active");
-    if (activeSegment && panel.querySelector("[data-follow-playback]")?.checked) {
+    if (activeSegment && workspace.querySelector("[data-follow-playback]")?.checked) {
       const focused = document.activeElement?.matches?.("[data-segment-text]");
       if (!focused) activeSegment.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   };
 
-  player.addEventListener("timeupdate", sync);
-  player.addEventListener("seeked", sync);
+  player.addEventListener("timeupdate", sync, { signal });
+  player.addEventListener("seeked", sync, { signal });
   player.addEventListener("ended", () => {
     activeSegment?.classList.remove("is-active");
     activeSegment = null;
-  });
+  }, { signal });
   panel.querySelectorAll("[data-seek]").forEach((button) => {
     button.addEventListener("click", () => {
       player.currentTime = Number(button.dataset.seek);
       player.play().catch(() => {});
       sync();
-    });
+    }, { signal });
   });
-  panel.querySelectorAll("[data-skip]").forEach((button) => {
+  workspace.querySelectorAll("[data-skip]").forEach((button) => {
     button.addEventListener("click", () => {
       player.currentTime = Math.max(0, Math.min(player.duration || Infinity, player.currentTime + Number(button.dataset.skip)));
       sync();
-    });
+    }, { signal });
   });
+  sync();
 }
 
 function wireTextEditing(panel) {
@@ -381,6 +410,7 @@ function wireEditor(root = document) {
 }
 
 function wireApp(root = document) {
+  wireUploadPreview(root);
   wirePolling(root);
   wireStageElapsed(root);
   wireEditor(root);

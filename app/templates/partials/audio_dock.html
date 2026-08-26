@@ -1,0 +1,33 @@
+<div class="audio-dock job-audio-dock" data-job-audio-dock>
+  <div class="audio-heading">
+    <div>
+      <p class="eyebrow">Audio workspace</p>
+      <h2>
+        {% if job.status.value == "done" %}
+          Listen and edit in sync
+        {% else %}
+          Listen while the transcript is generated
+        {% endif %}
+      </h2>
+    </div>
+    <label class="follow-control">
+      <input type="checkbox" data-follow-playback checked>
+      <span>Follow playback</span>
+    </label>
+  </div>
+  <audio
+    data-audio-player
+    controls
+    preload="metadata"
+    aria-label="Playback for {{ job.filename }}"
+    src="/jobs/{{ job.id }}/audio?source=original"
+  >
+    Your browser does not support audio playback.
+  </audio>
+  <div class="audio-shortcuts">
+    <button type="button" class="secondary-button" data-skip="-5">−5s</button>
+    <output data-playback-time>00:00</output>
+    <button type="button" class="secondary-button" data-skip="5">+5s</button>
+    <span>Click any timestamp to jump to that segment.</span>
+  </div>
+</div>

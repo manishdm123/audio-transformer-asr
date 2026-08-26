@@ -7,10 +7,14 @@
   </aside>
 
   <main class="workspace">
+    {% include "partials/selected_audio_dock.html" %}
     {% if active_job %}
-      {% with job=active_job %}
-        {% include "partials/job_panel.html" %}
-      {% endwith %}
+      <div class="job-workspace" data-job-workspace>
+        {% with job=active_job %}
+          {% include "partials/audio_dock.html" %}
+          {% include "partials/job_panel.html" %}
+        {% endwith %}
+      </div>
     {% else %}
       <section class="empty-state">
         <h1>Audio2Text</h1>

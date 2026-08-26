@@ -9,7 +9,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from app.jobs import DiarizationTurn, Job, JobStatus, JobStore, TranscriptionOptions
-from app.transcription import transcribe_job
+from app.transcription import _normalized_audio_path, transcribe_job
 
 
 class TranscriptionProgressTests(unittest.TestCase):
@@ -78,6 +78,28 @@ class TranscriptionProgressTests(unittest.TestCase):
         job.stage_started_at = datetime.now(timezone.utc) - timedelta(seconds=75)
 
         self.assertGreaterEqual(job.stage_elapsed_seconds, 75)
+
+    def test_audio_normalization_is_published_atomically(self) -> None:
+        job = self.make_job()
+        target = self.directory / f"{job.id}.wav"
+        observed: dict[str, object] = {}
+
+        def fake_run(command: list[str], **_kwargs) -> None:
+            temporary = Path(command[-1])
+            observed["temporary"] = temporary
+            observed["target_existed_during_conversion"] = target.exists()
+            temporary.write_bytes(b"RIFF" + b"0" * 256)
+
+        with (
+            patch("app.transcription.shutil.which", return_value="/usr/bin/ffmpeg"),
+            patch("app.transcription.subprocess.run", side_effect=fake_run),
+        ):
+            result = _normalized_audio_path(job)
+
+        self.assertEqual(result, target)
+        self.assertFalse(observed["target_existed_during_conversion"])
+        self.assertEqual(target.read_bytes(), b"RIFF" + b"0" * 256)
+        self.assertFalse(Path(observed["temporary"]).exists())
 
     def test_preliminary_exports_are_ready_before_diarization(self) -> None:
         job = self.make_job(diarization=True)

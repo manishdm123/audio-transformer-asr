@@ -77,28 +77,6 @@
 
   {% if job.status.value == "done" and job.segments %}
     <section class="editor-tools" aria-label="Transcript editor tools">
-      <div class="audio-dock">
-        <div class="audio-heading">
-          <div>
-            <p class="eyebrow">Audio workspace</p>
-            <h2>Listen and edit in sync</h2>
-          </div>
-          <label class="follow-control">
-            <input type="checkbox" data-follow-playback checked>
-            <span>Follow playback</span>
-          </label>
-        </div>
-        <audio data-audio-player controls preload="metadata" src="/jobs/{{ job.id }}/audio">
-          Your browser does not support audio playback.
-        </audio>
-        <div class="audio-shortcuts">
-          <button type="button" class="secondary-button" data-skip="-5">−5s</button>
-          <output data-playback-time>00:00</output>
-          <button type="button" class="secondary-button" data-skip="5">+5s</button>
-          <span>Click any timestamp to jump to that segment.</span>
-        </div>
-      </div>
-
       <div class="edit-toolbar">
         <div class="toolbar-heading">
           <div>

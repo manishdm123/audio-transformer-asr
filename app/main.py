@@ -117,12 +117,12 @@ def index(request: Request) -> HTMLResponse:
 async def create_job(
     background_tasks: BackgroundTasks,
     audio: UploadFile = File(...),
-    model_size: str = Form("small"),
+    model_size: str = Form("medium"),
     language: str = Form("en"),
     compute_type: str = Form("int8"),
     word_timestamps: bool = Form(False),
     vad_filter: bool = Form(True),
-    diarization: bool = Form(False),
+    diarization: bool = Form(True),
     num_speakers: str = Form(""),
     min_speakers: str = Form(""),
     max_speakers: str = Form(""),
@@ -222,12 +222,14 @@ def download(job_id: str, kind: str) -> FileResponse:
 @app.get("/jobs/{job_id}/audio")
 def job_audio(job_id: str) -> FileResponse:
     job = _get_job(job_id)
-    normalized = job.output_dir / f"{job.id}.wav"
-    path = normalized if normalized.exists() else job.upload_path
+    # Keep the browser-facing resource immutable for the lifetime of the player.
+    # The normalized WAV is produced in the background and must never replace an
+    # in-flight range request for the original upload.
+    path = job.upload_path
     if not path.exists():
         raise HTTPException(status_code=404, detail="Audio file is not available")
     media_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
-    return FileResponse(path, media_type=media_type)
+    return FileResponse(path, media_type=media_type, headers={"Cache-Control": "no-store"})
 
 
 @app.put("/jobs/{job_id}/segments")

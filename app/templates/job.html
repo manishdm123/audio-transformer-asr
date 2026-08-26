@@ -7,6 +7,10 @@
   </aside>
 
   <main class="workspace">
-    {% include "partials/job_panel.html" %}
+    {% include "partials/selected_audio_dock.html" %}
+    <div class="job-workspace" data-job-workspace>
+      {% include "partials/audio_dock.html" %}
+      {% include "partials/job_panel.html" %}
+    </div>
   </main>
 {% endblock %}
