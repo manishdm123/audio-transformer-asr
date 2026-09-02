@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import time
+from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import contextmanager
 from pathlib import Path
 from threading import Event, Thread
@@ -56,6 +57,8 @@ def transcribe_job(job_id: str, store: JobStore) -> None:
         job.options.language or "auto",
         job.options.diarization,
     )
+    diarization_executor: ThreadPoolExecutor | None = None
+    diarization_future: Future | None = None
     try:
         store.update(job.id, status=JobStatus.RUNNING, stage="Preparing audio", progress=0.05)
         audio_path = _normalized_audio_path(job)
@@ -66,6 +69,14 @@ def transcribe_job(job_id: str, store: JobStore) -> None:
             audio_path.stat().st_size,
             time.monotonic() - job_started,
         )
+
+        if job.options.diarization:
+            # Diarization only needs the normalized audio, not Whisper's output, so it can
+            # run on its own thread for the full duration of model loading + transcription
+            # instead of waiting for them to finish.
+            diarization_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="audio2text-diarize")
+            diarization_future = diarization_executor.submit(diarize_audio, audio_path, job)
+            logger.info("job=%s diarization_started_concurrently_with_transcription", job.id)
 
         store.update(job.id, stage="Loading model", progress=0.15)
         model_started = time.monotonic()
@@ -166,7 +177,8 @@ def transcribe_job(job_id: str, store: JobStore) -> None:
             )
 
             store.update(job.id, stage="Diarizing speakers (transcript ready)", progress=0.92)
-            turns = diarize_audio(audio_path, job)
+            assert diarization_future is not None
+            turns = diarization_future.result()
             segments = assign_speakers(segments, turns)
             store.update(job.id, diarization_turns=turns, segments=segments.copy(), progress=0.98)
 
@@ -199,6 +211,9 @@ def transcribe_job(job_id: str, store: JobStore) -> None:
             time.monotonic() - job_started,
             error_message,
         )
+    finally:
+        if diarization_executor is not None:
+            diarization_executor.shutdown(wait=False)
 
 
 def write_exports(job: Job) -> None:
@@ -344,7 +359,7 @@ def diarize_audio(audio_path: Path, job: Job) -> list[DiarizationTurn]:
     diarization_started = time.monotonic()
     logger.info("job=%s diarization_started audio=%s", job.id, audio_path.name)
     with _operation_heartbeat(job.id, "diarization"):
-        output = pipeline(str(audio_path), **kwargs)
+        output = _run_diarization_pipeline(pipeline, audio_path, kwargs, job)
     diarization = getattr(output, "speaker_diarization", output)
     exclusive = getattr(output, "exclusive_speaker_diarization", None)
     if exclusive is not None:
@@ -369,6 +384,25 @@ def diarize_audio(audio_path: Path, job: Job) -> list[DiarizationTurn]:
         time.monotonic() - diarization_started,
     )
     return result
+
+
+def _run_diarization_pipeline(pipeline: Any, audio_path: Path, kwargs: dict[str, int], job: Job) -> Any:
+    # Unlike CTranslate2 (Whisper), pyannote's plain-PyTorch models support Apple's MPS backend.
+    import torch
+
+    if torch.backends.mps.is_available():
+        try:
+            pipeline.to(torch.device("mps"))
+            output = pipeline(str(audio_path), **kwargs)
+            logger.info("job=%s diarization_device=mps", job.id)
+            return output
+        except Exception:
+            logger.warning("job=%s diarization_mps_failed falling_back_to_cpu", job.id, exc_info=True)
+            pipeline.to(torch.device("cpu"))
+
+    output = pipeline(str(audio_path), **kwargs)
+    logger.info("job=%s diarization_device=cpu", job.id)
+    return output
 
 
 def assign_speakers(segments: list[Segment], turns: list[DiarizationTurn]) -> list[Segment]:

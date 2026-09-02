@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import tempfile
+import threading
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -101,22 +102,30 @@ class TranscriptionProgressTests(unittest.TestCase):
         self.assertEqual(target.read_bytes(), b"RIFF" + b"0" * 256)
         self.assertFalse(Path(observed["temporary"]).exists())
 
-    def test_preliminary_exports_are_ready_before_diarization(self) -> None:
+    def test_diarization_runs_concurrently_with_transcription(self) -> None:
         job = self.make_job(diarization=True)
-        observed: dict[str, object] = {}
+        test_case = self
+        diarization_started = threading.Event()
 
         class FakeWhisperModel:
             def __init__(self, *_args, **_kwargs) -> None:
                 pass
 
             def transcribe(self, *_args, **_kwargs):
-                segments = [SimpleNamespace(start=0.0, end=3.0, text=" Raw transcript", words=[])]
-                return iter(segments), SimpleNamespace(duration=3.0, language="en")
+                def segments():
+                    # Diarization is submitted before model loading even starts, so by the
+                    # time transcription yields its first segment it must already be running
+                    # on its own thread rather than waiting for transcription to finish.
+                    test_case.assertTrue(
+                        diarization_started.wait(timeout=2),
+                        "diarization should start concurrently with transcription, not after it",
+                    )
+                    yield SimpleNamespace(start=0.0, end=3.0, text=" Raw transcript", words=[])
+
+                return segments(), SimpleNamespace(duration=3.0, language="en")
 
         def fake_diarize(_audio_path: Path, current_job: Job) -> list[DiarizationTurn]:
-            observed["exports_ready"] = current_job.exports_ready
-            observed["stage"] = current_job.stage
-            observed["txt"] = (self.directory / f"{current_job.id}.txt").read_text()
+            diarization_started.set()
             return [DiarizationTurn(0.0, 3.0, "SPEAKER_00")]
 
         fake_module = SimpleNamespace(WhisperModel=FakeWhisperModel)
@@ -127,9 +136,8 @@ class TranscriptionProgressTests(unittest.TestCase):
         ):
             transcribe_job(job.id, self.store)
 
-        self.assertTrue(observed["exports_ready"])
-        self.assertIn("Diarizing speakers", str(observed["stage"]))
-        self.assertIn("Raw transcript", str(observed["txt"]))
+        self.assertTrue((self.directory / f"{job.id}.txt").read_text().find("Raw transcript") >= 0)
+        self.assertTrue(job.exports_ready)
         self.assertEqual(job.status, JobStatus.DONE)
         self.assertEqual(job.segments[0].speaker, "SPEAKER_00")
 

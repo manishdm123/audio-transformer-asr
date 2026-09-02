@@ -15,7 +15,7 @@
         {% for model in models %}
           <option
             value="{{ model }}"
-            {% if model == (form_options.model_size if form_options else "medium") %}selected{% endif %}
+            {% if model == (form_options.model_size if form_options else "large-v3-turbo") %}selected{% endif %}
           >{{ model }}</option>
         {% endfor %}
       </select>

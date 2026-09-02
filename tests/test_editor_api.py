@@ -47,7 +47,7 @@ class TranscriptEditorApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         html = response.text
-        self.assertRegex(html, re.compile(r'<option\s+value="medium"\s+selected', re.MULTILINE))
+        self.assertRegex(html, re.compile(r'<option\s+value="large-v3-turbo"\s+selected', re.MULTILINE))
         self.assertRegex(html, r'name="diarization" checked')
         self.assertIn("data-audio-input", html)
         self.assertIn("data-selected-audio-player", html)
